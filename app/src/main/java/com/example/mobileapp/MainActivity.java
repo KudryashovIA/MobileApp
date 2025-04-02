@@ -1,123 +1,94 @@
 package com.example.mobileapp;
-//
-//import androidx.appcompat.app.AppCompatActivity;
-//
-//import android.os.Bundle;
-//
-//public class MainActivity extends AppCompatActivity {
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
-//    }
-//}
-
-
-//import com.google.firebase.analytics.FirebaseAnalytics;
-//
-//public class MainActivity extends AppCompatActivity {
-//
-//    private FirebaseAnalytics mFirebaseAnalytics;
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//        setContentView(R.layout.activity_main);
-//
-//        // Инициализация Firebase Analytics
-//        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
-//
-//        // Логирование события
-//        Bundle bundle = new Bundle();
-//        bundle.putString(FirebaseAnalytics.Param.ITEM_ID, "id_example");
-//        bundle.putString(FirebaseAnalytics.Param.ITEM_NAME, "name_example");
-//        mFirebaseAnalytics.logEvent(FirebaseAnalytics.Event.SELECT_ITEM, bundle);
-//    }
-//}
-
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity {
+import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity {
     private String selectedTopic = "";
+    private final List<QuestionsList> questionsList = new ArrayList<>();
+    private LinearLayout firstBlock, secondBlock, thirdBlock, fourthBlock;
+    private Button startBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initializeViews();
 
-        final LinearLayout firstBlock = findViewById(R.id.firstLayout);
-        final LinearLayout secondBlock = findViewById(R.id.secondLayout);
-        final LinearLayout thirdsBlock = findViewById(R.id.thirdsLayout);
-        final LinearLayout fourthBlock = findViewById(R.id.fourthLayout);
+        firstBlock.setOnClickListener(view -> selectTopic("Автомобили", firstBlock));
+        secondBlock.setOnClickListener(view -> selectTopic("Фильмы", secondBlock));
+        thirdBlock.setOnClickListener(view -> selectTopic("Города", thirdBlock));
+        fourthBlock.setOnClickListener(view -> selectTopic("IT сфера", fourthBlock));
+        startBtn.setOnClickListener(view -> startQuiz());
+    }
 
-        final Button startBtn = findViewById(R.id.startBtn);
+    private void initializeViews() {
+        firstBlock = findViewById(R.id.firstLayout);
+        secondBlock = findViewById(R.id.secondLayout);
+        thirdBlock = findViewById(R.id.thirdsLayout);
+        fourthBlock = findViewById(R.id.fourthLayout);
+        startBtn = findViewById(R.id.startBtn);
+    }
 
-        firstBlock.setOnClickListener(new View.OnClickListener() {
+    private void selectTopic(String topic, LinearLayout selectedBlock) {
+        selectedTopic = topic;
+        resetBlockStyles();
+        selectedBlock.setBackgroundResource(R.drawable.back_stroke_block_layout);
+        loadQuestionsFromFirebase();
+    }
+
+    private void resetBlockStyles() {
+        firstBlock.setBackgroundResource(R.drawable.roung_back);
+        secondBlock.setBackgroundResource(R.drawable.roung_back);
+        thirdBlock.setBackgroundResource(R.drawable.roung_back);
+        fourthBlock.setBackgroundResource(R.drawable.roung_back);
+    }
+
+    private void loadQuestionsFromFirebase() {
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("questions");
+        databaseReference.orderByChild("topic").equalTo(selectedTopic).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onClick(View view) {
-                selectedTopic = "Автомобили";
-                firstBlock.setBackgroundResource(R.drawable.back_stroke_block_layout);
-                secondBlock.setBackgroundResource(R.drawable.roung_back);
-                thirdsBlock.setBackgroundResource(R.drawable.roung_back);
-                fourthBlock.setBackgroundResource(R.drawable.roung_back);
-            }
-        });
-
-        secondBlock.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                selectedTopic = "Фильмы";
-                secondBlock.setBackgroundResource(R.drawable.back_stroke_block_layout);
-                firstBlock.setBackgroundResource(R.drawable.roung_back);
-                thirdsBlock.setBackgroundResource(R.drawable.roung_back);
-                fourthBlock.setBackgroundResource(R.drawable.roung_back);
-            }
-        });
-
-        thirdsBlock.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                selectedTopic = "Города";
-                thirdsBlock.setBackgroundResource(R.drawable.back_stroke_block_layout);
-                firstBlock.setBackgroundResource(R.drawable.roung_back);
-                secondBlock.setBackgroundResource(R.drawable.roung_back);
-                fourthBlock.setBackgroundResource(R.drawable.roung_back);
-            }
-        });
-
-        fourthBlock.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                selectedTopic = "IT сфера";
-                fourthBlock.setBackgroundResource(R.drawable.back_stroke_block_layout);
-                firstBlock.setBackgroundResource(R.drawable.roung_back);
-                secondBlock.setBackgroundResource(R.drawable.roung_back);
-                thirdsBlock.setBackgroundResource(R.drawable.roung_back);
-
-            }
-        });
-
-        startBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (selectedTopic.isEmpty()){
-                    Toast.makeText(MainActivity.this, "Выберите викторину", Toast.LENGTH_SHORT).show();
-                }else {
-                    Intent intent = new Intent(MainActivity.this, QuizActivity.class);
-                    intent.putExtra("selectedTopic", selectedTopic);
-                    startActivity(intent);
-                    finish();
+            public void onDataChange(DataSnapshot snapshot) {
+                questionsList.clear();
+                for (DataSnapshot questionSnapshot : snapshot.getChildren()) {
+                    QuestionsList questionItem = questionSnapshot.getValue(QuestionsList.class);
+                    if (questionItem != null) {
+                        questionsList.add(questionItem);
+                    }
                 }
+                Log.d("Firebase", "Загружено " + questionsList.size() + " вопросов");
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                Toast.makeText(MainActivity.this, "Ошибка загрузки данных", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void startQuiz() {
+        if (selectedTopic.isEmpty()) {
+            Toast.makeText(MainActivity.this, "Выберите викторину", Toast.LENGTH_SHORT).show();
+        } else {
+            Intent intent = new Intent(MainActivity.this, QuizActivity.class);
+            intent.putExtra("selectedTopic", selectedTopic);
+            startActivity(intent);
+            finish();
+        }
     }
 }

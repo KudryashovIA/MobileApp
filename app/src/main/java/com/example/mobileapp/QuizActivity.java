@@ -6,27 +6,21 @@ import androidx.appcompat.widget.AppCompatButton;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class QuizActivity extends AppCompatActivity {
 
-    private TextView question;
-    private TextView questions;
-    private AppCompatButton option1, option2, option3, option4;
-    private AppCompatButton nextBtn;
-
+    private TextView question, questions, timer;
+    private AppCompatButton option1, option2, option3, option4, nextBtn;
     private Timer quizTimer;
     private int seconds = 0;
     private int totalTimeInMins = 1;
-
     private List<QuestionsList> questionsList;
     private int currentQuestionPosition = 0;
     private String selectedOptionByUser = "";
@@ -35,9 +29,10 @@ public class QuizActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_quiz);
-        final ImageView backBtn = findViewById(R.id.backBtn);
-        final TextView timer = findViewById(R.id.timer);
-        final TextView selectedTopicName = findViewById(R.id.selectedTopicName);
+
+        ImageView backBtn = findViewById(R.id.backBtn);
+        timer = findViewById(R.id.timer);
+        TextView selectedTopicName = findViewById(R.id.selectedTopicName);
 
         questions = findViewById(R.id.questions);
         question = findViewById(R.id.question);
@@ -45,155 +40,131 @@ public class QuizActivity extends AppCompatActivity {
         option2 = findViewById(R.id.option2);
         option3 = findViewById(R.id.option3);
         option4 = findViewById(R.id.option4);
-
         nextBtn = findViewById(R.id.nextBtn);
 
-
-        final String getSelectedTopic = getIntent().getStringExtra("selectedTopic");
-
+        String getSelectedTopic = getIntent().getStringExtra("selectedTopic");
         selectedTopicName.setText(getSelectedTopic);
 
-        questionsList = QestionBank.getQuestion(getSelectedTopic);
+        loadQuestions(getSelectedTopic);
+        startTimer();
 
-        startTimer(timer);
-
-        questions.setText((currentQuestionPosition + 1) + "/" + questionsList.size());
-        question.setText(questionsList.get(0).getQuestion());
-        option1.setText(questionsList.get(0).getOption1());
-        option2.setText(questionsList.get(0).getOption2());
-        option3.setText(questionsList.get(0).getOption3());
-        option4.setText(questionsList.get(0).getOption4());
-
-
-        backBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                quizTimer.purge();
-                quizTimer.cancel();
-
-                startActivity(new Intent(QuizActivity.this, MainActivity.class));
-                finish();
-            }
+        backBtn.setOnClickListener(view -> {
+            quizTimer.cancel();
+            startActivity(new Intent(QuizActivity.this, MainActivity.class));
+            finish();
         });
+    }
 
-        option1.setOnClickListener(new View.OnClickListener() {
+    private void loadQuestions(String topic) {
+        QestionBank questionBank = new QestionBank();
+        questionBank.fetchQuestionsFromFirebase(topic, new QestionBank.QuestionsCallback() {
             @Override
-            public void onClick(View view) {
-                if (selectedOptionByUser.isEmpty()){
-                    selectedOptionByUser = option1.getText().toString();
-                    option1.setBackgroundResource(R.drawable.round_back_red_10);
-                    option1.setTextColor(Color.WHITE);
-
-                    revealAnswer();
-                    questionsList.get(currentQuestionPosition).setUserSelectedAnswer(selectedOptionByUser);
+            public void onQuestionsLoaded(List<QuestionsList> questions) {
+                if (questions.isEmpty()) {
+                    Toast.makeText(QuizActivity.this, "Вопросы не найдены!", Toast.LENGTH_SHORT).show();
+                    finish();
+                    return;
                 }
+                questionsList = questions;
+                displayQuestion();
             }
-        });
-        option2.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (selectedOptionByUser.isEmpty()){
-                    selectedOptionByUser = option2.getText().toString();
-                    option2.setBackgroundResource(R.drawable.round_back_red_10);
-                    option2.setTextColor(Color.WHITE);
 
-                    revealAnswer();
-                    questionsList.get(currentQuestionPosition).setUserSelectedAnswer(selectedOptionByUser);
-                }
-            }
-        });
-        option3.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
-                if (selectedOptionByUser.isEmpty()){
-                    selectedOptionByUser = option3.getText().toString();
-                    option3.setBackgroundResource(R.drawable.round_back_red_10);
-                    option3.setTextColor(Color.WHITE);
-
-                    revealAnswer();
-                    questionsList.get(currentQuestionPosition).setUserSelectedAnswer(selectedOptionByUser);
-                }
-            }
-        });
-        option4.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (selectedOptionByUser.isEmpty()){
-                    selectedOptionByUser = option4.getText().toString();
-                    option4.setBackgroundResource(R.drawable.round_back_red_10);
-                    option4.setTextColor(Color.WHITE);
-
-                    revealAnswer();
-                    questionsList.get(currentQuestionPosition).setUserSelectedAnswer(selectedOptionByUser);
-                }
-            }
-        });
-        nextBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (selectedOptionByUser.isEmpty()){
-                    Toast.makeText(QuizActivity.this, "Пожалуйста сделайте выбор", Toast.LENGTH_SHORT).show();
-                }
-                else {
-                    changeNextQuestion();
-                }
+            public void onError(String error) {
+                Toast.makeText(QuizActivity.this, "Ошибка загрузки: " + error, Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void startTimer(TextView timerTextView) {
+    private void displayQuestion() {
+        QuestionsList q = questionsList.get(currentQuestionPosition);
+        questions.setText((currentQuestionPosition + 1) + "/" + questionsList.size());
+        question.setText(q.getQuestion());
+        option1.setText(q.getOption1());
+        option2.setText(q.getOption2());
+        option3.setText(q.getOption3());
+        option4.setText(q.getOption4());
+
+        option1.setOnClickListener(view -> selectOption(option1));
+        option2.setOnClickListener(view -> selectOption(option2));
+        option3.setOnClickListener(view -> selectOption(option3));
+        option4.setOnClickListener(view -> selectOption(option4));
+
+        nextBtn.setOnClickListener(view -> {
+            if (selectedOptionByUser.isEmpty()) {
+                Toast.makeText(this, "Выберите вариант!", Toast.LENGTH_SHORT).show();
+            } else {
+                goToNextQuestion();
+            }
+        });
+    }
+
+    private void selectOption(AppCompatButton selectedButton) {
+        if (!selectedOptionByUser.isEmpty()) return;
+
+        selectedOptionByUser = selectedButton.getText().toString();
+        selectedButton.setBackgroundResource(R.drawable.round_back_red_10);
+        selectedButton.setTextColor(Color.WHITE);
+
+        QuestionsList currentQuestion = questionsList.get(currentQuestionPosition);
+        currentQuestion.setUserSelectedAnswer(selectedOptionByUser);
+
+        revealAnswer();
+    }
+
+    private void revealAnswer() {
+        String correctAnswer = questionsList.get(currentQuestionPosition).getAnswer();
+        for (AppCompatButton btn : new AppCompatButton[]{option1, option2, option3, option4}) {
+            if (btn.getText().toString().equals(correctAnswer)) {
+                btn.setBackgroundResource(R.drawable.round_back_green_10);
+                btn.setTextColor(Color.WHITE);
+            }
+        }
+    }
+
+    private void goToNextQuestion() {
+        stopTimer();
+        startTimer();
+
+        if (++currentQuestionPosition < questionsList.size()) {
+            selectedOptionByUser = "";
+            resetButtonStyles();
+            displayQuestion();
+        } else {
+            endQuiz();
+        }
+    }
+
+    private void resetButtonStyles() {
+        for (AppCompatButton btn : new AppCompatButton[]{option1, option2, option3, option4}) {
+            btn.setBackgroundResource(R.drawable.round_back_stroke_10);
+            btn.setTextColor(Color.parseColor("#1F6BB8"));
+        }
+    }
+
+    private void startTimer() {
         quizTimer = new Timer();
         quizTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                if (seconds == 0 && totalTimeInMins > 0) {
-                    totalTimeInMins--;
-                    seconds = 59;
-                } else if (seconds == 0 && totalTimeInMins == 0) {
-                    quizTimer.purge();
+                if (seconds == 0 && totalTimeInMins == 0) {
                     quizTimer.cancel();
-
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(QuizActivity.this, "Время вышло! Ответ засчитан как неправильный.", Toast.LENGTH_SHORT).show();
-
-                            questionsList.get(currentQuestionPosition).setUserSelectedAnswer("Неправильный");
-
-                            if (currentQuestionPosition < questionsList.size() - 1) {
-                                changeNextQuestion();
-                            } else {
-                                Intent intent = new Intent(QuizActivity.this, QuizResults.class);
-                                intent.putExtra("correct", getCorrectAnswers());
-                                intent.putExtra("incorrect", getInCorrectAnswers());
-                                startActivity(intent);
-                                finish();
-                            }
-                        }
+                    runOnUiThread(() -> {
+                        Toast.makeText(QuizActivity.this, "Время вышло!", Toast.LENGTH_SHORT).show();
+                        endQuiz();
                     });
                 } else {
-                    seconds--;
-                }
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        String finalMinutes = String.valueOf(totalTimeInMins);
-                        String finalSeconds = String.valueOf(seconds);
-
-                        if (finalMinutes.length() == 1) {
-                            finalMinutes = "0" + finalMinutes;
-                        }
-                        if (finalSeconds.length() == 1) {
-                            finalSeconds = "0" + finalSeconds;
-                        }
-                        timerTextView.setText(finalMinutes + ":" + finalSeconds);
+                    if (seconds == 0) {
+                        totalTimeInMins--;
+                        seconds = 59;
+                    } else {
+                        seconds--;
                     }
-                });
+                }
+                runOnUiThread(() -> timer.setText(String.format("%02d:%02d", totalTimeInMins, seconds)));
             }
         }, 1000, 1000);
     }
-
 
     private void stopTimer() {
         if (quizTimer != null) {
@@ -204,36 +175,30 @@ public class QuizActivity extends AppCompatActivity {
         seconds = 0;
     }
 
+    private void endQuiz() {
+        int correctAnswers = getCorrectAnswers();
+        int incorrectAnswers = questionsList.size() - correctAnswers;
+        String selectedTopic = getIntent().getStringExtra("selectedTopic");
 
-    private int getCorrectAnswers(){
-
-        int correctAnswers = 0;
-
-        for (int i = 0; i < questionsList.size(); i++){
-            final String getUserSelectedAnswer = questionsList.get(i).getUserSelectedAnswer();
-            final String getAnswer = questionsList.get(i).getAnswer();
-
-            if (getUserSelectedAnswer.equals(getAnswer)){
-                correctAnswers++;
-            }
-        }
-        return correctAnswers;
+        Intent intent = new Intent(this, QuizResults.class);
+        intent.putExtra("correct", correctAnswers);
+        intent.putExtra("incorrect", incorrectAnswers);
+        intent.putExtra("selectedTopic", selectedTopic);
+        startActivity(intent);
+        finish();
     }
 
-    private int getInCorrectAnswers(){
 
-        int correctAnswers = 0;
-
-        for (int i = 0; i < questionsList.size(); i++){
-            final String getUserSelectedAnswer = questionsList.get(i).getUserSelectedAnswer();
-            final String getAnswer = questionsList.get(i).getAnswer();
-
-            if (!getUserSelectedAnswer.equals(getAnswer)){
-                correctAnswers++;
+    private int getCorrectAnswers() {
+        int count = 0;
+        for (QuestionsList q : questionsList) {
+            if (q.getUserSelectedAnswer() != null && q.getUserSelectedAnswer().equals(q.getAnswer())) {
+                count++;
             }
         }
-        return correctAnswers;
+        return count;
     }
+
 
     @Override
     public void onBackPressed() {
@@ -244,63 +209,5 @@ public class QuizActivity extends AppCompatActivity {
 
         startActivity(new Intent(QuizActivity.this, MainActivity.class));
         finish();
-    }
-
-    private void revealAnswer(){
-        final String getAnswer = questionsList.get(currentQuestionPosition).getAnswer();
-        if (option1.getText().toString().equals(getAnswer)){
-            option1.setBackgroundResource(R.drawable.round_back_green_10);
-            option1.setTextColor(Color.WHITE);
-        }
-        else if (option2.getText().toString().equals(getAnswer)){
-            option2.setBackgroundResource(R.drawable.round_back_green_10);
-            option2.setTextColor(Color.WHITE);
-        }
-        else if (option3.getText().toString().equals(getAnswer)){
-            option3.setBackgroundResource(R.drawable.round_back_green_10);
-            option3.setTextColor(Color.WHITE);
-        }
-        else if (option4.getText().toString().equals(getAnswer)){
-            option4.setBackgroundResource(R.drawable.round_back_green_10);
-            option4.setTextColor(Color.WHITE);
-        }
-    }
-
-    private void changeNextQuestion(){
-        stopTimer();
-        startTimer((TextView) findViewById(R.id.timer));
-        currentQuestionPosition++;
-        if((currentQuestionPosition + 1) == questionsList.size()){
-            nextBtn.setText("Готово");
-        }
-        if (currentQuestionPosition < questionsList.size()){
-            selectedOptionByUser = "";
-
-            option1.setBackgroundResource(R.drawable.round_back_stroke_10);
-            option1.setTextColor(Color.parseColor("#1F6BB8"));
-
-            option2.setBackgroundResource(R.drawable.round_back_stroke_10);
-            option2.setTextColor(Color.parseColor("#1F6BB8"));
-
-            option3.setBackgroundResource(R.drawable.round_back_stroke_10);
-            option3.setTextColor(Color.parseColor("#1F6BB8"));
-
-            option4.setBackgroundResource(R.drawable.round_back_stroke_10);
-            option4.setTextColor(Color.parseColor("#1F6BB8"));
-
-            questions.setText((currentQuestionPosition + 1) + "/" + questionsList.size());
-            question.setText(questionsList.get(currentQuestionPosition).getQuestion());
-            option1.setText(questionsList.get(currentQuestionPosition).getOption1());
-            option2.setText(questionsList.get(currentQuestionPosition).getOption2());
-            option3.setText(questionsList.get(currentQuestionPosition).getOption3());
-            option4.setText(questionsList.get(currentQuestionPosition).getOption4());
-        }
-        else {
-            Intent intent = new Intent(QuizActivity.this, QuizResults.class);
-            intent.putExtra("correct", getCorrectAnswers());
-            intent.putExtra("incorrect", getInCorrectAnswers());
-            startActivity(intent);
-            finish();
-        }
     }
 }

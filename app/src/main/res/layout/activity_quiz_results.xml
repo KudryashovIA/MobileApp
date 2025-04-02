@@ -18,17 +18,30 @@
         android:src="@drawable/last" />
 
     <TextView
+        android:id="@+id/selectedTopicText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/lastpng"
+        android:text="Тема викторины: "
+        android:textSize="30sp"
+        android:layout_marginTop="-20dp"
+        android:layout_marginBottom="15dp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:gravity="center"/>
+
+    <TextView
         android:id="@+id/successTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:layout_marginEnd="10dp"
         android:gravity="center"
-        android:layout_below="@+id/lastpng"
+        android:layout_below="@+id/selectedTopicText"
         android:text="Ваш результат: "
         android:textColor="#FFFFFF"
         android:textStyle="bold"
-        android:textSize="30sp" />
+        android:textSize="26sp" />
 
     <LinearLayout
         android:layout_below="@+id/successTextView"
